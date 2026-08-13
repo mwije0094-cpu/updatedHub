@@ -603,7 +603,7 @@
                 </div>
                 <div>
                     <p class="brand-name mb-0">APEX <span>DESK</span></p>
-                    <p class="brand-tagline">RISK · DCA · ANALYSIS TERMINAL1</p>
+                    <p class="brand-tagline">RISK · DCA · ANALYSIS TERMINAL</p>
                 </div>
             </div>
             <span class="status-pill d-none d-lg-inline-flex"><span class="status-dot"></span> LIVE MARKET FEED</span>
@@ -1200,18 +1200,16 @@
             "toolbar_bg": "#f1f3f6",
             "enable_publishing": false,
             "allow_symbol_change": true,
-            "hide_side_toolbar": false,          // Left Side Toolbar (Drawing tools) එක පෙන්වීම
-            "withdateranges": true,               // Date Range bar එක පෙන්වීම
-            "hide_top_toolbar": false,            // Top Toolbar එක පෙන්වීම
-            "container_id": "chart-container",    // Chart Container ID එක
+            "hide_side_toolbar": false,
+            "withdateranges": true,
+            "hide_top_toolbar": false,
+            "container_id": "chart-container",
             "enabled_features": [
-                "header_fullscreen_button",        // Native TradingView Fullscreen Button එක
-                "left_toolbar",                    // Left Side Drawing Toolbar එක Force Enable කිරීම
-                "control_bar"                      // Bottom Navigation Bar එක
+                "header_fullscreen_button",
+                "left_toolbar",
+                "control_bar"
             ],
-            "disabled_features": [
-                // "header_saveload" වැනි අනවශ්‍ය දේ පමණක් මෙහි තබන්න
-            ]
+            "disabled_features": []
         });
     }
 
@@ -1234,20 +1232,26 @@
         return numerator / denominator;
     }
 
+    // UPDATED RISK + DCA SIGNAL PROCESSOR
     async function processLiveSignal() {
         const symbol = document.getElementById("symbol").value.trim().toUpperCase();
         const signal = document.getElementById("signal").value;
         const sl = parseFloat(document.getElementById("sl").value);
         let tp = parseFloat(document.getElementById("tp").value);
-        const rr = parseFloat(document.getElementById("rr").value);
-        const risk = parseFloat(document.getElementById("risk").value);
-        const leverage = parseFloat(document.getElementById("leverage").value);
+        const rr = parseFloat(document.getElementById("rr").value) || 2;
+        const risk = parseFloat(document.getElementById("risk").value) || 1;
+        const leverage = parseFloat(document.getElementById("leverage").value) || 20;
         const dca_p2 = parseFloat(document.getElementById("dca_p2").value);
-        const dca_profit = parseFloat(document.getElementById("dca_profit").value);
+        const dca_profit = parseFloat(document.getElementById("dca_profit").value) || 5;
         const user = auth.currentUser;
 
         if (!user) {
             toast("Please login first!", "error");
+            return;
+        }
+
+        if (isNaN(sl) || isNaN(dca_p2)) {
+            toast("Please check SL and DCA Target Exit prices!", "error");
             return;
         }
 
@@ -1286,22 +1290,24 @@
                 uid: user.uid,
                 author: authorName,
                 avatar: avatar,
-                symbol, 
-                signal, 
-                entry: entryPrice, 
-                sl, 
-                tp, 
+                symbol: symbol, 
+                signal: signal, 
+                entry: entryPrice || 0, 
+                sl: sl || 0, 
+                tp: tp || 0, 
                 messageText: tgMsg, 
                 timestamp: firebase.database.ServerValue.TIMESTAMP 
             };
-            console.log("[TRADE SIGNAL] pushing payload:", payload);
-            const pushRef = await db.ref('signals').push(payload);
-            console.log("[TRADE SIGNAL] push OK, key =", pushRef.key);
+
+            console.log("[TRADE SIGNAL] Pushing payload:", payload);
+            await db.ref('signals').push(payload);
 
             document.getElementById("telegram-msg-content").innerHTML = tgMsg;
             previewModal.show();
+            toast("Signal sent & saved successfully!", "success");
+
         } catch (err) {
-            console.error("[TRADE SIGNAL] push FAILED:", err);
+            console.error("[TRADE SIGNAL] Push FAILED:", err);
             toast(`Failed: ${err.message}`, "error");
         }
     }
@@ -1349,10 +1355,11 @@
 
             document.getElementById("telegram-msg-content").innerHTML = tgMsg;
             previewModal.show();
+            toast("DCA Signal saved successfully!", "success");
         } catch (err) { toast(`Failed: ${err.message}`, "error"); }
     }
 
-    // LISTEN TO SIGNALS HISTORY (UPDATED WITH PROFILE AVATAR & USERNAME)
+    // LISTEN TO SIGNALS HISTORY
     let allSignalsHistory = [];
     let historySearchQuery = "";
 
@@ -1404,7 +1411,7 @@
         db.ref('signals').limitToLast(20).on('value', (snapshot) => {
             const items = [];
             snapshot.forEach((child) => items.push({ key: child.key, ...child.val() }));
-            console.log("[HISTORY] snapshot received, count =", items.length, items);
+            console.log("[HISTORY] snapshot received, count =", items.length);
             allSignalsHistory = items;
             renderSignalsHistory();
         }, (err) => {
@@ -1551,7 +1558,6 @@
             allChatMessages = items;
             renderChatList();
 
-            // Unread badge: count new messages from OTHER users while chat panel is closed
             if (!chatFirstLoad && newestKey && newestKey !== lastChatMsgKey) {
                 const isFromOther = !currentUser || newestItem.uid !== currentUser.uid;
                 if (isFromOther && !chatOffcanvasOpen) {
@@ -1790,7 +1796,6 @@
             });
             input.value = "";
 
-            // NOTIFICATION: tell the post's author (if it's not their own reply)
             const postSnap = await db.ref(`analysis_posts/${postId}`).once('value');
             const post = postSnap.val();
             if (post && post.uid && post.uid !== user.uid) {
@@ -1810,7 +1815,7 @@
         }
     }
 
-    // ============ PHASE 2: ONLINE PRESENCE ============
+    // ONLINE PRESENCE
     function setupPresence(uid) {
         const myPresenceRef = db.ref(`presence/${uid}`);
         db.ref('.info/connected').on('value', (snap) => {
@@ -1826,7 +1831,7 @@
         });
     }
 
-    // ============ PHASE 3: PRICE ALERTS ============
+    // PRICE ALERTS
     let userPriceAlerts = [];
     let alertPollingStarted = false;
 
@@ -1922,14 +1927,12 @@
         }
     }
 
-
     function listenToUserNotifications(uid) {
-        if (notifListenerStarted) return; // avoid duplicate listeners across re-logins
+        if (notifListenerStarted) return;
         notifListenerStarted = true;
 
         const notifRef = db.ref(`notifications/${uid}`).limitToLast(30);
 
-        // Full list render (also drives the unread badge count)
         notifRef.on('value', (snapshot) => {
             const items = [];
             let unread = 0;
@@ -1942,7 +1945,6 @@
             updateBadge(document.getElementById("notif-bell-badge"), unread);
         });
 
-        // Fire a real browser notification only for NEW replies (skip the initial batch on page load)
         notifRef.on('child_added', (snap) => {
             if (!notifInitialLoadDone) return;
             const n = snap.val();
@@ -1956,7 +1958,6 @@
             }
         });
 
-        // Mark initial load complete shortly after first snapshot so child_added above only fires for genuinely new items
         notifRef.once('value', () => { setTimeout(() => { notifInitialLoadDone = true; }, 800); });
     }
 
@@ -2017,7 +2018,6 @@
         }
     }
 
-    // Close notif dropdown when clicking outside of it
     document.addEventListener('click', function(e) {
         const wrap = document.getElementById('notif-bell-btn');
         const dd = document.getElementById('notif-dropdown-list');
@@ -2032,7 +2032,6 @@
         previewModal = new bootstrap.Modal(document.getElementById('msgModal'));
         profileModal = new bootstrap.Modal(document.getElementById('profileModal'));
 
-        // Track offcanvas open/close state so unread badges know when the panel is visible
         const chatOff = document.getElementById('chatOffcanvas');
         chatOff.addEventListener('shown.bs.offcanvas', () => {
             chatOffcanvasOpen = true;
