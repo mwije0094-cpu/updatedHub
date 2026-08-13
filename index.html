@@ -383,6 +383,43 @@
         .notif-item.read .notif-dot { background: transparent; }
         .notif-empty { text-align:center; color: var(--text-faint); font-size: 12px; padding: 24px 10px; }
 
+        /* ---------- PHASE 2 & 3 ---------- */
+        .online-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(45,212,167,0.1); border: 1px solid rgba(45,212,167,0.3);
+            color: var(--buy); font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 50px;
+        }
+        .online-pill .pulse-dot-live { width:7px; height:7px; border-radius:50%; background: var(--buy); animation: pulse-dot 1.4s infinite; }
+
+        .reaction-bar { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+        .reaction-chip {
+            background: var(--panel); border: 1px solid var(--border-soft); color: var(--text-dim);
+            font-size: 11px; padding: 2px 7px; border-radius: 50px; cursor: pointer; display:inline-flex; gap:4px; align-items:center;
+        }
+        .reaction-chip:hover { border-color: var(--amber); }
+        .reaction-chip.reacted { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+        .reaction-add-btn { opacity: 0.5; }
+        .reaction-add-btn:hover { opacity: 1; }
+        .chat-msg-img { max-width: 100%; border-radius: 8px; margin-top: 6px; cursor: pointer; border: 1px solid var(--border); }
+
+        .search-box-wrap { position: relative; margin-bottom: 10px; }
+        .search-box-wrap input { padding-left: 32px !important; }
+        .search-box-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-faint); font-size: 13px; }
+
+        .tag-chip-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom: 10px; }
+        .tag-chip {
+            background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--text-dim);
+            font-size: 11px; padding: 4px 10px; border-radius: 50px; cursor: pointer;
+        }
+        .tag-chip.active { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+        .analysis-tag-pill { font-size: 10px; background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--text-dim); padding: 1px 7px; border-radius: 50px; margin-right: 4px; }
+
+        .alert-row {
+            background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 8px;
+            padding: 8px 10px; display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; font-size: 12px;
+        }
+        .alert-row .badge-dir { font-family: var(--font-mono, monospace); }
+
         /* ---------- Analysis feed ---------- */
         .analysis-card {
             background-color: var(--ink-raised);
@@ -570,6 +607,7 @@
                 </div>
             </div>
             <span class="status-pill d-none d-lg-inline-flex"><span class="status-dot"></span> LIVE MARKET FEED</span>
+            <span class="online-pill" id="online-users-pill"><span class="pulse-dot-live"></span> <span id="online-users-count">1</span> online</span>
         </div>
 
         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -627,6 +665,9 @@
                 </li>
                 <li class="nav-item">
                     <button class="nav-link" id="btn-share-tab" onclick="switchTab('share-panel', 'btn-share-tab')">📤 SHARE ANALYSIS</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="btn-alert-tab" onclick="switchTab('alert-panel', 'btn-alert-tab')">🔔 PRICE ALERTS</button>
                 </li>
             </ul>
 
@@ -739,6 +780,36 @@
                     </div>
                 </div>
 
+                <!-- PRICE ALERTS PANEL -->
+                <div class="tab-pane-custom" id="alert-panel">
+                    <div class="card card-custom p-3 mb-3">
+                        <h6 class="panel-heading"><i class="bi bi-bell"></i> NEW PRICE ALERT</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">Coin Symbol</label>
+                                <input type="text" id="alert-symbol" class="form-control" placeholder="BTCUSDT" value="BTCUSDT">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Direction</label>
+                                <select id="alert-direction" class="form-select">
+                                    <option value="above">Price goes ABOVE ▲</option>
+                                    <option value="below">Price goes BELOW ▼</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Target Price</label>
+                            <input type="number" step="any" id="alert-target" class="form-control" placeholder="e.g. 100000">
+                        </div>
+                        <button class="btn btn-accent w-100 py-2" onclick="createPriceAlert()">🔔 SET ALERT</button>
+                        <p class="small text-faint mt-2 mb-0"><i class="bi bi-info-circle"></i> Alerts only trigger while this browser tab is open and connected — checked every ~20 seconds against live Binance Futures mark price.</p>
+                    </div>
+                    <div class="card card-custom p-3">
+                        <h6 class="panel-heading"><i class="bi bi-list-check"></i> MY ACTIVE ALERTS</h6>
+                        <div id="alerts-list-container"><p class="small text-faint">No active alerts yet.</p></div>
+                    </div>
+                </div>
+
                 <!-- SHARE ANALYSIS PANEL -->
                 <div class="tab-pane-custom" id="share-panel">
                     <div class="card card-custom p-3">
@@ -757,6 +828,11 @@
                             <div class="mb-2">
                                 <label class="form-label">Analysis Notes</label>
                                 <textarea id="post-notes" class="form-control form-control-sm" rows="3" placeholder="SMC Liquidity grab at 63.5k..." required></textarea>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label">Tags <span class="text-faint" style="font-size:10px;">(comma separated e.g. Scalp, SMC, Breakout)</span></label>
+                                <input type="text" id="post-tags" class="form-control form-control-sm" placeholder="Scalp, SMC, 15m">
                             </div>
 
                             <div class="mb-3">
@@ -818,7 +894,14 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body" id="analysis-feed-container">
-        <div class="text-center text-muted py-4">Loading analysis posts...</div>
+        <div class="search-box-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" id="analysis-search-input" class="form-control form-control-sm" placeholder="Search by symbol, notes or tag..." oninput="applyAnalysisFilters()">
+        </div>
+        <div class="tag-chip-row" id="analysis-tag-filter-row"></div>
+        <div id="analysis-posts-list">
+            <div class="text-center text-muted py-4">Loading analysis posts...</div>
+        </div>
     </div>
 </div>
 
@@ -829,9 +912,19 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body d-flex flex-column justify-content-between p-3">
+        <div class="search-box-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" id="chat-search-input" class="form-control form-control-sm" placeholder="Search messages..." oninput="filterChatMessages(this.value)">
+        </div>
         <div class="chat-box mb-3" id="chat-messages-container"></div>
+        <div id="chat-image-preview-container" class="d-none mb-2 position-relative" style="max-width:120px;">
+            <img id="chat-pasted-image-preview" src="" class="img-fluid rounded border border-secondary">
+            <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1 py-0 px-1" onclick="clearSelectedChatImage()">✕</button>
+        </div>
         <form onsubmit="sendChatMessage(event)" class="d-flex gap-2">
-            <input type="text" id="chat-input-msg" class="form-control form-control-sm" placeholder="Type a message..." required autocomplete="off">
+            <input type="file" id="chat-image-file" accept="image/*" class="d-none" onchange="handleChatFileSelect(event)">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-2" onclick="document.getElementById('chat-image-file').click()"><i class="bi bi-image"></i></button>
+            <input type="text" id="chat-input-msg" class="form-control form-control-sm" placeholder="Type a message..." autocomplete="off">
             <button type="submit" class="btn btn-accent btn-sm fw-bold px-3">Send</button>
         </form>
     </div>
@@ -844,6 +937,10 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body">
+        <div class="search-box-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" id="history-search-input" class="form-control form-control-sm" placeholder="Search by symbol or trader..." oninput="filterSignalsHistory(this.value)">
+        </div>
         <div class="history-box" id="history-container"></div>
     </div>
 </div>
@@ -991,6 +1088,9 @@
             listenToAnalysisPosts();
             requestBrowserNotifPermission();
             listenToUserNotifications(user.uid);
+            setupPresence(user.uid);
+            listenToPriceAlerts(user.uid);
+            startAlertPolling();
         } else {
             document.getElementById("auth-container").style.display = "block";
             document.getElementById("main-app-container").style.display = "none";
@@ -1247,89 +1347,192 @@
     }
 
     // LISTEN TO SIGNALS HISTORY (UPDATED WITH PROFILE AVATAR & USERNAME)
-    function listenToFirebaseSignals() {
-        const container = document.getElementById("history-container");
-        db.ref('signals').limitToLast(20).on('value', (snapshot) => {
-            let html = "";
-            snapshot.forEach((child) => {
-                const item = child.val();
-                const authorName = item.author || "Trader";
-                const avatarUrl = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`;
-                const signalTime = item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    let allSignalsHistory = [];
+    let historySearchQuery = "";
 
-                html = `
-                    <div class="history-card ${item.signal === 'SELL' ? 'sell' : ''}">
-                        <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom border-secondary">
-                            <div class="d-flex align-items-center gap-2">
-                                <img src="${avatarUrl}" class="avatar-sm">
-                                <span class="accent-text fw-bold" style="font-size: 13px;">${authorName}</span>
-                            </div>
-                            <span class="text-muted small">${signalTime}</span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <strong class="text-white fs-6">${item.symbol}</strong>
-                            <span class="badge ${item.signal === 'BUY' ? 'bg-success' : 'bg-danger'}">${item.signal}</span>
-                        </div>
-                        <div class="small text-light mt-2" style="white-space:pre-wrap;">${item.messageText || ''}</div>
-                    </div>` + html;
-            });
-            container.innerHTML = html || '<div class="text-muted text-center py-3">No signals shared yet.</div>';
+    function renderSignalCard(item) {
+        const authorName = item.author || "Trader";
+        const avatarUrl = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`;
+        const signalTime = item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        return `
+            <div class="history-card ${item.signal === 'SELL' ? 'sell' : ''}">
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom border-secondary">
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="${avatarUrl}" class="avatar-sm">
+                        <span class="accent-text fw-bold" style="font-size: 13px;">${authorName}</span>
+                    </div>
+                    <span class="text-muted small">${signalTime}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <strong class="text-white fs-6">${item.symbol}</strong>
+                    <span class="badge ${item.signal === 'BUY' ? 'bg-success' : 'bg-danger'}">${item.signal}</span>
+                </div>
+                <div class="small text-light mt-2" style="white-space:pre-wrap;">${item.messageText || ''}</div>
+            </div>`;
+    }
+
+    function renderSignalsHistory() {
+        const container = document.getElementById("history-container");
+        const q = historySearchQuery.trim().toLowerCase();
+        const filtered = q ? allSignalsHistory.filter(item =>
+            (item.symbol || "").toLowerCase().includes(q) || (item.author || "").toLowerCase().includes(q)
+        ) : allSignalsHistory;
+        container.innerHTML = filtered.map(renderSignalCard).reverse().join("") ||
+            '<div class="text-muted text-center py-3">No signals shared yet.</div>';
+    }
+
+    function filterSignalsHistory(query) {
+        historySearchQuery = query;
+        renderSignalsHistory();
+    }
+
+    function listenToFirebaseSignals() {
+        db.ref('signals').limitToLast(20).on('value', (snapshot) => {
+            const items = [];
+            snapshot.forEach((child) => items.push(child.val()));
+            allSignalsHistory = items;
+            renderSignalsHistory();
         });
     }
 
     // PUBLIC CHAT
+    let selectedChatImageFile = null;
+
     async function sendChatMessage(e) {
         e.preventDefault();
         const input = document.getElementById("chat-input-msg");
         const msgText = input.value.trim();
         const user = auth.currentUser;
-        if (!msgText || !user) return;
+        if ((!msgText && !selectedChatImageFile) || !user) return;
 
         const senderName = user.displayName || user.email.split('@')[0];
         const avatar = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}`;
 
-        await db.ref('public_chat').push({
-            uid: user.uid, 
-            sender: senderName, 
+        const payload = {
+            uid: user.uid,
+            sender: senderName,
             avatar: avatar,
-            message: msgText, 
+            message: msgText,
             timestamp: firebase.database.ServerValue.TIMESTAMP
-        });
+        };
+
+        if (selectedChatImageFile) {
+            try {
+                const formData = new FormData();
+                formData.append("file", selectedChatImageFile);
+                formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+                const res = await fetch(CLOUDINARY_URL, { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.secure_url) payload.imageUrl = data.secure_url;
+            } catch (err) {
+                toast("Image upload failed: " + err.message, "error");
+            }
+            clearSelectedChatImage();
+        }
+
+        await db.ref('public_chat').push(payload);
         input.value = "";
     }
 
+    function handleChatFileSelect(e) {
+        if (e.target.files[0]) {
+            selectedChatImageFile = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                document.getElementById('chat-pasted-image-preview').src = ev.target.result;
+                document.getElementById('chat-image-preview-container').classList.remove('d-none');
+            };
+            reader.readAsDataURL(selectedChatImageFile);
+        }
+    }
+
+    function clearSelectedChatImage() {
+        selectedChatImageFile = null;
+        document.getElementById('chat-image-file').value = "";
+        document.getElementById('chat-pasted-image-preview').src = "";
+        document.getElementById('chat-image-preview-container').classList.add('d-none');
+    }
+
+    const REACTION_EMOJIS = ["👍", "🔥", "🚀"];
     let lastChatMsgKey = null;
     let chatFirstLoad = true;
+    let allChatMessages = [];
+    let chatSearchQuery = "";
+
+    function renderChatMessage(item) {
+        const currentUser = auth.currentUser;
+        const isMe = currentUser && item.uid === currentUser.uid;
+        const avatarUrl = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.sender)}`;
+        const imgHtml = item.imageUrl ? `<a href="${item.imageUrl}" target="_blank"><img src="${item.imageUrl}" class="chat-msg-img"></a>` : "";
+        const msgHtml = item.message ? `<div>${item.message}</div>` : "";
+
+        let reactionsHtml = `<div class="reaction-bar">`;
+        REACTION_EMOJIS.forEach(emoji => {
+            const reactors = (item.reactions && item.reactions[emoji]) || {};
+            const count = Object.keys(reactors).length;
+            const reacted = currentUser && reactors[currentUser.uid];
+            if (count > 0 || true) {
+                reactionsHtml += `<span class="reaction-chip ${reacted ? 'reacted' : ''}" onclick="toggleReaction('${item.id}','${emoji}')">${emoji}${count > 0 ? ' ' + count : ''}</span>`;
+            }
+        });
+        reactionsHtml += `</div>`;
+
+        return `
+            <div class="chat-msg ${isMe ? 'my-msg' : ''}" data-msg-id="${item.id}">
+                <div class="chat-msg-top-row mb-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="${avatarUrl}" class="avatar-sm">
+                        <span class="accent-text fw-bold small">${item.sender}</span>
+                    </div>
+                    <span class="chat-msg-time">${formatChatTime(item.timestamp)}</span>
+                </div>
+                ${msgHtml}
+                ${imgHtml}
+                ${reactionsHtml}
+            </div>`;
+    }
+
+    function renderChatList() {
+        const chatContainer = document.getElementById("chat-messages-container");
+        const q = chatSearchQuery.trim().toLowerCase();
+        const filtered = q ? allChatMessages.filter(m =>
+            (m.message || "").toLowerCase().includes(q) || (m.sender || "").toLowerCase().includes(q)
+        ) : allChatMessages;
+        chatContainer.innerHTML = filtered.map(renderChatMessage).join("") ||
+            `<div class="text-center text-faint py-4 small">No messages found.</div>`;
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function filterChatMessages(query) {
+        chatSearchQuery = query;
+        renderChatList();
+    }
+
+    function toggleReaction(msgId, emoji) {
+        const user = auth.currentUser;
+        if (!user) return;
+        const reactionRef = db.ref(`public_chat/${msgId}/reactions/${emoji}/${user.uid}`);
+        reactionRef.once('value', (snap) => {
+            if (snap.exists()) reactionRef.remove();
+            else reactionRef.set(true);
+        });
+    }
 
     function listenToPublicChat() {
-        const chatContainer = document.getElementById("chat-messages-container");
         const currentUser = auth.currentUser;
 
         db.ref('public_chat').limitToLast(50).on('value', (snapshot) => {
-            let html = "";
+            const items = [];
             let newestKey = null;
             let newestItem = null;
             snapshot.forEach((child) => {
-                const item = child.val();
+                const item = { id: child.key, ...child.val() };
+                items.push(item);
                 newestKey = child.key;
                 newestItem = item;
-                const isMe = currentUser && item.uid === currentUser.uid;
-                const avatarUrl = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.sender)}`;
-                
-                html += `
-                    <div class="chat-msg ${isMe ? 'my-msg' : ''}">
-                        <div class="chat-msg-top-row mb-1">
-                            <div class="d-flex align-items-center gap-2">
-                                <img src="${avatarUrl}" class="avatar-sm">
-                                <span class="accent-text fw-bold small">${item.sender}</span>
-                            </div>
-                            <span class="chat-msg-time">${formatChatTime(item.timestamp)}</span>
-                        </div>
-                        <div>${item.message}</div>
-                    </div>`;
             });
-            chatContainer.innerHTML = html;
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            allChatMessages = items;
+            renderChatList();
 
             // Unread badge: count new messages from OTHER users while chat panel is closed
             if (!chatFirstLoad && newestKey && newestKey !== lastChatMsgKey) {
@@ -1391,6 +1594,8 @@
         const symbol = document.getElementById("post-symbol").value.trim().toUpperCase();
         const bias = document.getElementById("post-bias").value;
         const notes = document.getElementById("post-notes").value.trim();
+        const tagsRaw = document.getElementById("post-tags").value.trim();
+        const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
         const user = auth.currentUser;
 
         if (!selectedImageFile || !user) {
@@ -1417,11 +1622,12 @@
                 uid: user.uid, 
                 author: authorName,
                 avatar: avatar,
-                symbol, bias, notes, imageUrl: data.secure_url, likes: 0,
+                symbol, bias, notes, tags, imageUrl: data.secure_url, likes: 0,
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             });
 
             document.getElementById("post-notes").value = "";
+            document.getElementById("post-tags").value = "";
             clearSelectedImage();
             btn.disabled = false;
             toast("Analysis posted successfully!", "success");
@@ -1431,45 +1637,95 @@
         }
     }
 
+    let allAnalysisPosts = [];
+    let activeTagFilter = null;
+    let analysisSearchQuery = "";
+
+    function renderAnalysisTagRow() {
+        const row = document.getElementById("analysis-tag-filter-row");
+        if (!row) return;
+        const tagSet = new Set();
+        allAnalysisPosts.forEach(p => (p.tags || []).forEach(t => tagSet.add(t)));
+        if (tagSet.size === 0) { row.innerHTML = ""; return; }
+        let html = `<span class="tag-chip ${!activeTagFilter ? 'active' : ''}" onclick="setTagFilter(null)">All</span>`;
+        [...tagSet].forEach(t => {
+            html += `<span class="tag-chip ${activeTagFilter === t ? 'active' : ''}" onclick="setTagFilter('${t}')">#${t}</span>`;
+        });
+        row.innerHTML = html;
+    }
+
+    function setTagFilter(tag) {
+        activeTagFilter = tag;
+        renderAnalysisTagRow();
+        applyAnalysisFilters();
+    }
+
+    function applyAnalysisFilters() {
+        analysisSearchQuery = (document.getElementById("analysis-search-input")?.value || "").trim().toLowerCase();
+        renderAnalysisPostsList();
+    }
+
+    function renderAnalysisPostsList() {
+        const listEl = document.getElementById("analysis-posts-list");
+        if (!listEl) return;
+        let posts = allAnalysisPosts;
+
+        if (activeTagFilter) {
+            posts = posts.filter(p => (p.tags || []).includes(activeTagFilter));
+        }
+        if (analysisSearchQuery) {
+            posts = posts.filter(p =>
+                (p.symbol || "").toLowerCase().includes(analysisSearchQuery) ||
+                (p.notes || "").toLowerCase().includes(analysisSearchQuery) ||
+                (p.tags || []).some(t => t.toLowerCase().includes(analysisSearchQuery))
+            );
+        }
+
+        if (!posts.length) {
+            listEl.innerHTML = `<div class="text-center text-faint py-4 small">No matching analysis posts.</div>`;
+            return;
+        }
+
+        let html = "";
+        posts.forEach((post) => {
+            const avatarUrl = post.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author)}`;
+            const tagsHtml = (post.tags || []).map(t => `<span class="analysis-tag-pill">#${t}</span>`).join("");
+            html += `
+                <div class="analysis-card" id="post-card-${post.id}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <img src="${avatarUrl}" class="avatar-sm">
+                            <strong class="accent-text">${post.author}</strong>
+                        </div>
+                        <span class="badge ${post.bias === 'BULLISH' ? 'bg-success' : 'bg-danger'}">${post.symbol}</span>
+                    </div>
+                    <a href="${post.imageUrl}" target="_blank"><img src="${post.imageUrl}" class="analysis-img mb-2"></a>
+                    <p class="small text-light mb-1">${post.notes}</p>
+                    ${tagsHtml ? `<div class="mb-2">${tagsHtml}</div>` : ""}
+                    <button class="btn btn-sm btn-outline-danger py-0 mb-2" onclick="likePost('${post.id}', ${post.likes || 0})">❤️ ${post.likes || 0}</button>
+                    
+                    <div id="replies-list-${post.id}" class="d-flex flex-column gap-1 mb-2"></div>
+                    
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="reply-input-${post.id}" class="form-control" placeholder="Write a reply...">
+                        <button class="btn btn-accent btn-sm" onclick="addReply('${post.id}')">Send</button>
+                    </div>
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+        posts.forEach((post) => listenToReplies(post.id));
+    }
+
     function listenToAnalysisPosts() {
-        const feed = document.getElementById("analysis-feed-container");
         db.ref("analysis_posts").limitToLast(20).on("value", (snapshot) => {
-            let html = "";
             const posts = [];
             snapshot.forEach((child) => {
                 posts.unshift({ id: child.key, ...child.val() });
             });
-
-            posts.forEach((post) => {
-                const avatarUrl = post.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author)}`;
-                html += `
-                    <div class="analysis-card" id="post-card-${post.id}">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div class="d-flex align-items-center gap-2">
-                                <img src="${avatarUrl}" class="avatar-sm">
-                                <strong class="accent-text">${post.author}</strong>
-                            </div>
-                            <span class="badge ${post.bias === 'BULLISH' ? 'bg-success' : 'bg-danger'}">${post.symbol}</span>
-                        </div>
-                        <a href="${post.imageUrl}" target="_blank"><img src="${post.imageUrl}" class="analysis-img mb-2"></a>
-                        <p class="small text-light mb-2">${post.notes}</p>
-                        <button class="btn btn-sm btn-outline-danger py-0 mb-2" onclick="likePost('${post.id}', ${post.likes || 0})">❤️ ${post.likes || 0}</button>
-                        
-                        <div id="replies-list-${post.id}" class="d-flex flex-column gap-1 mb-2"></div>
-                        
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="reply-input-${post.id}" class="form-control" placeholder="Write a reply...">
-                            <button class="btn btn-accent btn-sm" onclick="addReply('${post.id}')">Send</button>
-                        </div>
-                    </div>
-                `;
-            });
-
-            feed.innerHTML = html;
-
-            posts.forEach((post) => {
-                listenToReplies(post.id);
-            });
+            allAnalysisPosts = posts;
+            renderAnalysisTagRow();
+            renderAnalysisPostsList();
         });
     }
 
@@ -1537,7 +1793,119 @@
         }
     }
 
-    // ============ PHASE 1: NOTIFICATION BELL ============
+    // ============ PHASE 2: ONLINE PRESENCE ============
+    function setupPresence(uid) {
+        const myPresenceRef = db.ref(`presence/${uid}`);
+        db.ref('.info/connected').on('value', (snap) => {
+            if (snap.val() === true) {
+                myPresenceRef.onDisconnect().remove();
+                myPresenceRef.set(true);
+            }
+        });
+        db.ref('presence').on('value', (snap) => {
+            const count = snap.exists() ? snap.numChildren() : 0;
+            const el = document.getElementById("online-users-count");
+            if (el) el.innerText = Math.max(count, 1);
+        });
+    }
+
+    // ============ PHASE 3: PRICE ALERTS ============
+    let userPriceAlerts = [];
+    let alertPollingStarted = false;
+
+    function listenToPriceAlerts(uid) {
+        db.ref(`price_alerts/${uid}`).on('value', (snapshot) => {
+            const items = [];
+            snapshot.forEach(child => items.push({ id: child.key, ...child.val() }));
+            userPriceAlerts = items;
+            renderAlertsList();
+        });
+    }
+
+    function renderAlertsList() {
+        const container = document.getElementById("alerts-list-container");
+        if (!container) return;
+        const active = userPriceAlerts.filter(a => !a.triggered);
+        if (!active.length) {
+            container.innerHTML = `<p class="small text-faint">No active alerts yet.</p>`;
+            return;
+        }
+        container.innerHTML = active.map(a => `
+            <div class="alert-row">
+                <div>
+                    <strong class="accent-text">${a.symbol}</strong>
+                    <span class="badge-dir text-dim"> ${a.direction === 'above' ? '▲ above' : '▼ below'} ${a.target}</span>
+                </div>
+                <button class="btn btn-sm btn-outline-danger py-0" onclick="deletePriceAlert('${a.id}')">✕</button>
+            </div>
+        `).join("");
+    }
+
+    async function createPriceAlert() {
+        const user = auth.currentUser;
+        if (!user) return;
+        const symbol = document.getElementById("alert-symbol").value.trim().toUpperCase();
+        const direction = document.getElementById("alert-direction").value;
+        const target = parseFloat(document.getElementById("alert-target").value);
+
+        if (!symbol || isNaN(target)) {
+            toast("Please enter a valid symbol and target price", "error");
+            return;
+        }
+
+        await db.ref(`price_alerts/${user.uid}`).push({
+            symbol, direction, target,
+            triggered: false,
+            createdAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        document.getElementById("alert-target").value = "";
+        toast(`Alert set for ${symbol} ${direction} ${target}`, "success");
+    }
+
+    function deletePriceAlert(alertId) {
+        const user = auth.currentUser;
+        if (!user) return;
+        db.ref(`price_alerts/${user.uid}/${alertId}`).remove();
+    }
+
+    function startAlertPolling() {
+        if (alertPollingStarted) return;
+        alertPollingStarted = true;
+        setInterval(checkPriceAlerts, 20000);
+    }
+
+    async function checkPriceAlerts() {
+        const user = auth.currentUser;
+        if (!user) return;
+        const active = userPriceAlerts.filter(a => !a.triggered);
+        if (!active.length) return;
+
+        const uniqueSymbols = [...new Set(active.map(a => a.symbol))];
+        const prices = {};
+        try {
+            for (const sym of uniqueSymbols) {
+                const res = await fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}`);
+                const data = await res.json();
+                prices[sym] = parseFloat(data.markPrice);
+            }
+        } catch (e) { return; }
+
+        for (const alert of active) {
+            const price = prices[alert.symbol];
+            if (!price) continue;
+            const hit = alert.direction === 'above' ? price >= alert.target : price <= alert.target;
+            if (hit) {
+                await db.ref(`price_alerts/${user.uid}/${alert.id}/triggered`).set(true);
+                showBrowserNotification(
+                    `🔔 ${alert.symbol} price alert`,
+                    `${alert.symbol} just went ${alert.direction} ${alert.target} (now ${price})`
+                );
+                toast(`🔔 ${alert.symbol} hit ${alert.target}!`, "success");
+            }
+        }
+    }
+
+
     function listenToUserNotifications(uid) {
         if (notifListenerStarted) return; // avoid duplicate listeners across re-logins
         notifListenerStarted = true;
