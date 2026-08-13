@@ -603,7 +603,7 @@
                 </div>
                 <div>
                     <p class="brand-name mb-0">APEX <span>DESK</span></p>
-                    <p class="brand-tagline">RISK · DCA · ANALYSIS1 TERMINAL</p>
+                    <p class="brand-tagline">RISK · DCA · ANALYSIS TERMINAL</p>
                 </div>
             </div>
             <span class="status-pill d-none d-lg-inline-flex"><span class="status-dot"></span> LIVE MARKET FEED</span>
@@ -1200,17 +1200,16 @@
             "toolbar_bg": "#f1f3f6",
             "enable_publishing": false,
             "allow_symbol_change": true,
-            "hide_side_toolbar": false,          // Left Side Toolbar (Drawing tools) එක පෙන්වීම
-            "withdateranges": true,               // Date Range bar එක පෙන්වීම
-            "hide_top_toolbar": false,            // Top Toolbar එක පෙන්වීම
-            "container_id": "chart-container",    // Chart Container ID එක
+            "hide_side_toolbar": false,          // Left Side Toolbar (Drawing tools)
+            "withdateranges": true,               // Date Range bar
+            "hide_top_toolbar": false,            // Top Toolbar
+            "container_id": "chart-container",    // Chart Container ID
             "enabled_features": [
-                "header_fullscreen_button",        // Native TradingView Fullscreen Button එක
-                "left_toolbar",                    // Left Side Drawing Toolbar එක Force Enable කිරීම
-                "control_bar"                      // Bottom Navigation Bar එක
+                "header_fullscreen_button",        // Native TradingView Fullscreen Button
+                "left_toolbar",                    // Left Side Drawing Toolbar Force Enable
+                "control_bar"                      // Bottom Navigation Bar
             ],
             "disabled_features": [
-                // "header_saveload" වැනි අනවශ්‍ය දේ පමණක් මෙහි තබන්න
             ]
         });
     }
@@ -1346,7 +1345,7 @@
         } catch (err) { toast(`Failed: ${err.message}`, "error"); }
     }
 
-    // LISTEN TO SIGNALS HISTORY (UPDATED WITH PROFILE AVATAR & USERNAME)
+    // LISTEN TO SIGNALS HISTORY (UPDATED FOR SORTING & AUTO-RE-RENDER ON DELETE)
     let allSignalsHistory = [];
     let historySearchQuery = "";
 
@@ -1377,8 +1376,13 @@
         const filtered = q ? allSignalsHistory.filter(item =>
             (item.symbol || "").toLowerCase().includes(q) || (item.author || "").toLowerCase().includes(q)
         ) : allSignalsHistory;
-        container.innerHTML = filtered.map(renderSignalCard).reverse().join("") ||
-            '<div class="text-muted text-center py-3">No signals shared yet.</div>';
+
+        if (!filtered.length) {
+            container.innerHTML = '<div class="text-muted text-center py-3">No signals shared yet.</div>';
+            return;
+        }
+
+        container.innerHTML = filtered.map(renderSignalCard).join("");
     }
 
     function filterSignalsHistory(query) {
@@ -1387,10 +1391,12 @@
     }
 
     function listenToFirebaseSignals() {
-        db.ref('signals').limitToLast(20).on('value', (snapshot) => {
+        db.ref('signals').limitToLast(50).on('value', (snapshot) => {
             const items = [];
-            snapshot.forEach((child) => items.push(child.val()));
-            allSignalsHistory = items;
+            snapshot.forEach((child) => {
+                items.push({ id: child.key, ...child.val() });
+            });
+            allSignalsHistory = items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             renderSignalsHistory();
         });
     }
@@ -1534,7 +1540,6 @@
             allChatMessages = items;
             renderChatList();
 
-            // Unread badge: count new messages from OTHER users while chat panel is closed
             if (!chatFirstLoad && newestKey && newestKey !== lastChatMsgKey) {
                 const isFromOther = !currentUser || newestItem.uid !== currentUser.uid;
                 if (isFromOther && !chatOffcanvasOpen) {
@@ -1773,7 +1778,6 @@
             });
             input.value = "";
 
-            // NOTIFICATION: tell the post's author (if it's not their own reply)
             const postSnap = await db.ref(`analysis_posts/${postId}`).once('value');
             const post = postSnap.val();
             if (post && post.uid && post.uid !== user.uid) {
@@ -1905,14 +1909,12 @@
         }
     }
 
-
     function listenToUserNotifications(uid) {
-        if (notifListenerStarted) return; // avoid duplicate listeners across re-logins
+        if (notifListenerStarted) return;
         notifListenerStarted = true;
 
         const notifRef = db.ref(`notifications/${uid}`).limitToLast(30);
 
-        // Full list render (also drives the unread badge count)
         notifRef.on('value', (snapshot) => {
             const items = [];
             let unread = 0;
@@ -1925,7 +1927,6 @@
             updateBadge(document.getElementById("notif-bell-badge"), unread);
         });
 
-        // Fire a real browser notification only for NEW replies (skip the initial batch on page load)
         notifRef.on('child_added', (snap) => {
             if (!notifInitialLoadDone) return;
             const n = snap.val();
@@ -1939,7 +1940,6 @@
             }
         });
 
-        // Mark initial load complete shortly after first snapshot so child_added above only fires for genuinely new items
         notifRef.once('value', () => { setTimeout(() => { notifInitialLoadDone = true; }, 800); });
     }
 
@@ -2000,7 +2000,6 @@
         }
     }
 
-    // Close notif dropdown when clicking outside of it
     document.addEventListener('click', function(e) {
         const wrap = document.getElementById('notif-bell-btn');
         const dd = document.getElementById('notif-dropdown-list');
@@ -2015,7 +2014,6 @@
         previewModal = new bootstrap.Modal(document.getElementById('msgModal'));
         profileModal = new bootstrap.Modal(document.getElementById('profileModal'));
 
-        // Track offcanvas open/close state so unread badges know when the panel is visible
         const chatOff = document.getElementById('chatOffcanvas');
         chatOff.addEventListener('shown.bs.offcanvas', () => {
             chatOffcanvasOpen = true;
