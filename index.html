@@ -1282,7 +1282,7 @@
                 `   🔥 Recovery Size (S2) : <code>$${s2.toFixed(2)} USDT</code>\n` +
                 `   📊 Total Position : <code>$${(usdtAmountSize + s2).toFixed(2)} USDT</code>`;
 
-            await db.ref('signals').push({ 
+            const payload = { 
                 uid: user.uid,
                 author: authorName,
                 avatar: avatar,
@@ -1293,11 +1293,17 @@
                 tp, 
                 messageText: tgMsg, 
                 timestamp: firebase.database.ServerValue.TIMESTAMP 
-            });
+            };
+            console.log("[TRADE SIGNAL] pushing payload:", payload);
+            const pushRef = await db.ref('signals').push(payload);
+            console.log("[TRADE SIGNAL] push OK, key =", pushRef.key);
 
             document.getElementById("telegram-msg-content").innerHTML = tgMsg;
             previewModal.show();
-        } catch (err) { toast(`Failed: ${err.message}`, "error"); }
+        } catch (err) {
+            console.error("[TRADE SIGNAL] push FAILED:", err);
+            toast(`Failed: ${err.message}`, "error");
+        }
     }
 
     async function processDcaOnlySignal() {
@@ -1377,7 +1383,15 @@
         const filtered = q ? allSignalsHistory.filter(item =>
             (item.symbol || "").toLowerCase().includes(q) || (item.author || "").toLowerCase().includes(q)
         ) : allSignalsHistory;
-        container.innerHTML = filtered.map(renderSignalCard).reverse().join("") ||
+        const cardsHtml = filtered.map(item => {
+            try {
+                return renderSignalCard(item);
+            } catch (e) {
+                console.error("[HISTORY] renderSignalCard failed for item:", item, e);
+                return "";
+            }
+        });
+        container.innerHTML = cardsHtml.reverse().join("") ||
             '<div class="text-muted text-center py-3">No signals shared yet.</div>';
     }
 
@@ -1389,9 +1403,12 @@
     function listenToFirebaseSignals() {
         db.ref('signals').limitToLast(20).on('value', (snapshot) => {
             const items = [];
-            snapshot.forEach((child) => items.push(child.val()));
+            snapshot.forEach((child) => items.push({ key: child.key, ...child.val() }));
+            console.log("[HISTORY] snapshot received, count =", items.length, items);
             allSignalsHistory = items;
             renderSignalsHistory();
+        }, (err) => {
+            console.error("[HISTORY] listener error:", err);
         });
     }
 
