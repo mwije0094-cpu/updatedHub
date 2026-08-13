@@ -302,6 +302,86 @@
             border-color: rgba(242,169,0,0.35);
             align-self: flex-end;
         }
+        .chat-msg-time {
+            font-size: 10px;
+            color: var(--text-faint);
+            margin-left: 8px;
+            font-family: var(--font-mono, 'JetBrains Mono', monospace);
+            white-space: nowrap;
+        }
+        .chat-msg-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        /* ---------- Notification Bell & Badges ---------- */
+        .nav-badge-wrap { position: relative; display: inline-flex; }
+        .nav-unread-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--sell);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            border-radius: 50px;
+            min-width: 17px;
+            height: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            border: 2px solid var(--ink);
+            font-family: var(--font-mono, monospace);
+        }
+        .notif-bell-btn {
+            position: relative;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .notif-bell-btn:hover { border-color: var(--amber); color: var(--amber); }
+        .notif-dropdown {
+            position: absolute;
+            top: 46px;
+            right: 0;
+            width: 320px;
+            max-height: 420px;
+            overflow-y: auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            z-index: 2000;
+            padding: 6px;
+        }
+        .notif-item {
+            display: flex;
+            gap: 10px;
+            padding: 9px 8px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            cursor: pointer;
+        }
+        .notif-item:hover { background: var(--panel-2); }
+        .notif-item.unread { background: rgba(242,169,0,0.08); }
+        .notif-item .notif-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--amber); margin-top: 5px; flex-shrink: 0;
+        }
+        .notif-item.read .notif-dot { background: transparent; }
+        .notif-empty { text-align:center; color: var(--text-faint); font-size: 12px; padding: 24px 10px; }
 
         /* ---------- Analysis feed ---------- */
         .analysis-card {
@@ -498,15 +578,32 @@
                 <span class="small d-none d-md-inline"><span id="user-email-display" class="text-white fw-bold"></span></span>
             </div>
 
-            <button class="btn btn-outline-success btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#analysisOffcanvas">
-                <i class="bi bi-graph-up-arrow"></i> ANALYSIS FEED
-            </button>
-            <button class="btn btn-outline-warning btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#chatOffcanvas">
-                <i class="bi bi-chat-dots"></i> PUBLIC CHAT
-            </button>
+            <div class="nav-badge-wrap">
+                <button class="btn btn-outline-success btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#analysisOffcanvas" id="analysis-feed-btn">
+                    <i class="bi bi-graph-up-arrow"></i> ANALYSIS FEED
+                </button>
+                <span class="nav-unread-badge d-none" id="analysis-unread-badge">0</span>
+            </div>
+            <div class="nav-badge-wrap">
+                <button class="btn btn-outline-warning btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#chatOffcanvas" id="chat-feed-btn">
+                    <i class="bi bi-chat-dots"></i> PUBLIC CHAT
+                </button>
+                <span class="nav-unread-badge d-none" id="chat-unread-badge">0</span>
+            </div>
             <button class="btn btn-outline-info btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#historyOffcanvas">
                 <i class="bi bi-clock-history"></i> SIGNALS HISTORY
             </button>
+
+            <div class="nav-badge-wrap">
+                <button class="notif-bell-btn" type="button" id="notif-bell-btn" onclick="toggleNotifDropdown()">
+                    <i class="bi bi-bell-fill"></i>
+                </button>
+                <span class="nav-unread-badge d-none" id="notif-bell-badge">0</span>
+                <div class="notif-dropdown d-none" id="notif-dropdown-list">
+                    <div class="notif-empty">Loading...</div>
+                </div>
+            </div>
+
             <button class="btn btn-outline-danger btn-sm fw-bold py-2" onclick="logoutUser()"><i class="bi bi-box-arrow-right"></i> Logout</button>
         </div>
     </div>
@@ -798,6 +895,62 @@
     let isRegisterMode = false;
     let selectedImageFile = null;
 
+    // ============ PHASE 1: TIME FORMAT + NOTIFICATION STATE ============
+    let chatOffcanvasOpen = false;
+    let analysisOffcanvasOpen = false;
+    let notifDropdownOpen = false;
+    let chatUnreadCount = 0;
+    let analysisUnreadCount = 0;
+    let notifListenerStarted = false;
+    let notifInitialLoadDone = false;
+
+    function formatChatTime(ts) {
+        if (!ts) return "";
+        const d = new Date(ts);
+        const now = new Date();
+        const isToday = d.toDateString() === now.toDateString();
+        const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (isToday) return timeStr;
+        const dateStr = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+        return `${dateStr} ${timeStr}`;
+    }
+
+    function timeAgo(ts) {
+        if (!ts) return "";
+        const seconds = Math.floor((Date.now() - ts) / 1000);
+        if (seconds < 60) return "just now";
+        const mins = Math.floor(seconds / 60);
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        const days = Math.floor(hrs / 24);
+        return `${days}d ago`;
+    }
+
+    function requestBrowserNotifPermission() {
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+    }
+
+    function showBrowserNotification(title, body, icon) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            try {
+                new Notification(title, { body, icon: icon || undefined });
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    function updateBadge(el, count) {
+        if (!el) return;
+        if (count > 0) {
+            el.innerText = count > 99 ? "99+" : count;
+            el.classList.remove("d-none");
+        } else {
+            el.classList.add("d-none");
+        }
+    }
+
     // TOAST NOTIFICATIONS (replaces alert())
     function toast(message, type = "info") {
         const stack = document.getElementById("toast-stack");
@@ -836,6 +989,8 @@
             listenToFirebaseSignals();
             listenToPublicChat();
             listenToAnalysisPosts();
+            requestBrowserNotifPermission();
+            listenToUserNotifications(user.uid);
         } else {
             document.getElementById("auth-container").style.display = "block";
             document.getElementById("main-app-container").style.display = "none";
@@ -1143,28 +1298,49 @@
         input.value = "";
     }
 
+    let lastChatMsgKey = null;
+    let chatFirstLoad = true;
+
     function listenToPublicChat() {
         const chatContainer = document.getElementById("chat-messages-container");
         const currentUser = auth.currentUser;
 
         db.ref('public_chat').limitToLast(50).on('value', (snapshot) => {
             let html = "";
+            let newestKey = null;
+            let newestItem = null;
             snapshot.forEach((child) => {
                 const item = child.val();
+                newestKey = child.key;
+                newestItem = item;
                 const isMe = currentUser && item.uid === currentUser.uid;
                 const avatarUrl = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.sender)}`;
                 
                 html += `
                     <div class="chat-msg ${isMe ? 'my-msg' : ''}">
-                        <div class="d-flex align-items-center gap-2 mb-1">
-                            <img src="${avatarUrl}" class="avatar-sm">
-                            <span class="accent-text fw-bold small">${item.sender}</span>
+                        <div class="chat-msg-top-row mb-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <img src="${avatarUrl}" class="avatar-sm">
+                                <span class="accent-text fw-bold small">${item.sender}</span>
+                            </div>
+                            <span class="chat-msg-time">${formatChatTime(item.timestamp)}</span>
                         </div>
                         <div>${item.message}</div>
                     </div>`;
             });
             chatContainer.innerHTML = html;
             chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Unread badge: count new messages from OTHER users while chat panel is closed
+            if (!chatFirstLoad && newestKey && newestKey !== lastChatMsgKey) {
+                const isFromOther = !currentUser || newestItem.uid !== currentUser.uid;
+                if (isFromOther && !chatOffcanvasOpen) {
+                    chatUnreadCount++;
+                    updateBadge(document.getElementById("chat-unread-badge"), chatUnreadCount);
+                }
+            }
+            lastChatMsgKey = newestKey;
+            chatFirstLoad = false;
         });
     }
 
@@ -1340,14 +1516,153 @@
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             });
             input.value = "";
+
+            // NOTIFICATION: tell the post's author (if it's not their own reply)
+            const postSnap = await db.ref(`analysis_posts/${postId}`).once('value');
+            const post = postSnap.val();
+            if (post && post.uid && post.uid !== user.uid) {
+                await db.ref(`notifications/${post.uid}`).push({
+                    type: "reply",
+                    postId: postId,
+                    fromName: authorName,
+                    fromAvatar: avatar,
+                    text: msgText,
+                    symbol: post.symbol || "",
+                    read: false,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
         } catch (err) {
             toast("Reply failed: " + err.message, "error");
         }
     }
 
+    // ============ PHASE 1: NOTIFICATION BELL ============
+    function listenToUserNotifications(uid) {
+        if (notifListenerStarted) return; // avoid duplicate listeners across re-logins
+        notifListenerStarted = true;
+
+        const notifRef = db.ref(`notifications/${uid}`).limitToLast(30);
+
+        // Full list render (also drives the unread badge count)
+        notifRef.on('value', (snapshot) => {
+            const items = [];
+            let unread = 0;
+            snapshot.forEach((child) => {
+                const n = { id: child.key, ...child.val() };
+                items.unshift(n);
+                if (!n.read) unread++;
+            });
+            renderNotifDropdown(items);
+            updateBadge(document.getElementById("notif-bell-badge"), unread);
+        });
+
+        // Fire a real browser notification only for NEW replies (skip the initial batch on page load)
+        notifRef.on('child_added', (snap) => {
+            if (!notifInitialLoadDone) return;
+            const n = snap.val();
+            if (n.type === "reply") {
+                showBrowserNotification(
+                    `💬 New reply from ${n.fromName}`,
+                    n.text,
+                    n.fromAvatar
+                );
+                toast(`${n.fromName} replied to your ${n.symbol || ''} analysis`, "info");
+            }
+        });
+
+        // Mark initial load complete shortly after first snapshot so child_added above only fires for genuinely new items
+        notifRef.once('value', () => { setTimeout(() => { notifInitialLoadDone = true; }, 800); });
+    }
+
+    function renderNotifDropdown(items) {
+        const list = document.getElementById("notif-dropdown-list");
+        if (!list) return;
+        if (!items.length) {
+            list.innerHTML = `<div class="notif-empty">No notifications yet</div>`;
+            return;
+        }
+        list.innerHTML = items.map(n => `
+            <div class="notif-item ${n.read ? 'read' : 'unread'}" onclick="openNotifTarget('${n.id}','${n.postId || ''}')">
+                <div class="notif-dot"></div>
+                <div>
+                    <div><strong class="accent-text">${n.fromName || 'Someone'}</strong> replied: <span class="text-light">${(n.text || '').slice(0, 60)}</span></div>
+                    <div class="chat-msg-time">${timeAgo(n.timestamp)}</div>
+                </div>
+            </div>
+        `).join("");
+    }
+
+    function toggleNotifDropdown() {
+        const dd = document.getElementById("notif-dropdown-list");
+        notifDropdownOpen = !notifDropdownOpen;
+        dd.classList.toggle("d-none", !notifDropdownOpen);
+        if (notifDropdownOpen) markAllNotificationsRead();
+    }
+
+    function markAllNotificationsRead() {
+        const user = auth.currentUser;
+        if (!user) return;
+        db.ref(`notifications/${user.uid}`).once('value', (snapshot) => {
+            const updates = {};
+            snapshot.forEach((child) => {
+                if (!child.val().read) updates[`${child.key}/read`] = true;
+            });
+            if (Object.keys(updates).length) {
+                db.ref(`notifications/${user.uid}`).update(updates);
+            }
+        });
+    }
+
+    function openNotifTarget(notifId, postId) {
+        document.getElementById("notif-dropdown-list").classList.add("d-none");
+        notifDropdownOpen = false;
+        const offEl = document.getElementById('analysisOffcanvas');
+        const off = bootstrap.Offcanvas.getOrCreateInstance(offEl);
+        off.show();
+        if (postId) {
+            setTimeout(() => {
+                const card = document.getElementById(`post-card-${postId}`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.outline = "2px solid var(--amber)";
+                    setTimeout(() => card.style.outline = "none", 1500);
+                }
+            }, 350);
+        }
+    }
+
+    // Close notif dropdown when clicking outside of it
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('notif-bell-btn');
+        const dd = document.getElementById('notif-dropdown-list');
+        if (!dd || dd.classList.contains('d-none')) return;
+        if (!wrap.contains(e.target) && !dd.contains(e.target)) {
+            dd.classList.add('d-none');
+            notifDropdownOpen = false;
+        }
+    });
+
     window.onload = function() {
         previewModal = new bootstrap.Modal(document.getElementById('msgModal'));
         profileModal = new bootstrap.Modal(document.getElementById('profileModal'));
+
+        // Track offcanvas open/close state so unread badges know when the panel is visible
+        const chatOff = document.getElementById('chatOffcanvas');
+        chatOff.addEventListener('shown.bs.offcanvas', () => {
+            chatOffcanvasOpen = true;
+            chatUnreadCount = 0;
+            updateBadge(document.getElementById("chat-unread-badge"), 0);
+        });
+        chatOff.addEventListener('hidden.bs.offcanvas', () => { chatOffcanvasOpen = false; });
+
+        const analysisOff = document.getElementById('analysisOffcanvas');
+        analysisOff.addEventListener('shown.bs.offcanvas', () => {
+            analysisOffcanvasOpen = true;
+            analysisUnreadCount = 0;
+            updateBadge(document.getElementById("analysis-unread-badge"), 0);
+        });
+        analysisOff.addEventListener('hidden.bs.offcanvas', () => { analysisOffcanvasOpen = false; });
     };
 </script>
 </body>
